@@ -1,57 +1,49 @@
 // =====================================================================
-//  CONFIGURAÇÃO DA BARBEARIA
-//  Para cada cliente novo, só este arquivo precisa ser editado.
+//  CONFIGURAÇÃO DA BARBEARIA — VERSÃO DE TESTE
 // =====================================================================
 
 window.BARBEARIA = {
-  nome: 'Barbearia Modelo',
-  slogan: 'Corte, barba e estilo. Agende em menos de 1 minuto.',
-  endereco: 'Rua Exemplo, 123 - Centro',
-  whatsapp: '5511999999999',          // com DDI e DDD, só números
-  instagram: '',                      // sem o @ (deixe '' para esconder)
+  nome: 'Barbearia Teste',
+  slogan: '🧪 Site de demonstração. Pode agendar à vontade, é só um teste!',
+  endereco: 'Rua dos Testes, 000 - Bairro Teste',
+  whatsapp: '5511999999999',          // troque pelo seu número para testar o botão do WhatsApp
+  instagram: '',
 
   // Visual
-  cor: '#d4a64a',     // cor principal (ex.: '#d4a64a' dourado, '#e11d48' vermelho, '#2563eb' azul, '#16a34a' verde)
-  logo: '',           // arquivo de imagem na pasta, ex.: 'logo.png' (deixe '' para usar a tesoura)
+  cor: '#d4a64a',
+  logo: '',
 
-  intervaloMin: 30,        // de quanto em quanto tempo aparecem os horários
-  antecedenciaMin: 30,     // não deixa marcar com menos de X minutos de antecedência
-  diasAntecedencia: 21,    // quantos dias para frente o cliente pode agendar
+  intervaloMin: 30,
+  antecedenciaMin: 30,
+  diasAntecedencia: 21,
 
   // Horário de funcionamento (0 = domingo ... 6 = sábado). null = fechado.
   horarios: {
     0: null,
-    1: null,
+    1: ['09:00', '19:00'],
     2: ['09:00', '19:00'],
     3: ['09:00', '19:00'],
     4: ['09:00', '19:00'],
-    5: ['09:00', '20:00'],
-    6: ['08:00', '17:00'],
+    5: ['09:00', '19:00'],
+    6: ['09:00', '17:00'],
   },
-  pausa: ['12:00', '13:00'],   // almoço (deixe null para não ter pausa)
+  pausa: ['12:00', '13:00'],
 
   servicos: [
-    { id: 'corte',        nome: 'Corte',            preco: 35, duracao: 30, desc: 'Máquina e tesoura, finalizado com pomada' },
-    { id: 'barba',        nome: 'Barba',            preco: 25, duracao: 30, desc: 'Toalha quente, navalha e balm' },
-    { id: 'corte-barba',  nome: 'Corte + Barba',    preco: 55, duracao: 60, desc: 'O combo completo' },
-    { id: 'infantil',     nome: 'Corte Infantil',   preco: 30, duracao: 30, desc: 'Até 12 anos' },
-    { id: 'sobrancelha',  nome: 'Sobrancelha',      preco: 10, duracao: 15, desc: 'Na navalha' },
-    { id: 'pigmentacao',  nome: 'Pigmentação',      preco: 40, duracao: 30, desc: 'Para barba ou cabelo' },
+    { id: 'corte',       nome: 'Corte (teste)',         preco: 30, duracao: 30, desc: 'Serviço de exemplo' },
+    { id: 'barba',       nome: 'Barba (teste)',         preco: 20, duracao: 30, desc: 'Serviço de exemplo' },
+    { id: 'corte-barba', nome: 'Corte + Barba (teste)', preco: 45, duracao: 60, desc: 'Serviço de exemplo' },
+    { id: 'sobrancelha', nome: 'Sobrancelha (teste)',   preco: 10, duracao: 15, desc: 'Serviço de exemplo' },
   ],
 
   barbeiros: [
-    { id: 'joao',   nome: 'João',   especialidade: 'Degradê e navalhado' },
-    { id: 'rafael', nome: 'Rafael', especialidade: 'Barba e corte clássico' },
-    { id: 'lucas',  nome: 'Lucas',  especialidade: 'Cortes modernos' },
+    { id: 'barbeiro1', nome: 'Barbeiro Teste 1', especialidade: 'Perfil de exemplo' },
+    { id: 'barbeiro2', nome: 'Barbeiro Teste 2', especialidade: 'Perfil de exemplo' },
   ],
 };
 
-// =====================================================================
-//  SUPABASE — cole aqui os dados do seu projeto (veja o LEIA-ME).
-//  Enquanto estiver vazio, o site funciona em MODO DEMONSTRAÇÃO
-//  (os agendamentos ficam salvos só no seu navegador).
-// =====================================================================
+// SUPABASE — vazio = modo demonstração (agendamentos salvos só no navegador)
 window.SUPABASE_CONFIG = {
-  url: '',      // ex.: 'https://abcdefgh.supabase.co'
-  anonKey: '',  // a chave "anon public"
+  url: '',
+  anonKey: '',
 };
