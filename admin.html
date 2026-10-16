@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Painel do Barbeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="admin">
+
+<header class="topo">
+  <div class="wrap">
+    <a href="index.html" class="marca"><span class="mini-logo" data-logo>✂</span> <b data-nome></b></a>
+    <button class="link-btn" id="sair" hidden>Sair</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="aviso" class="aviso" hidden></div>
+
+  <section class="login" id="login" hidden>
+    <h1>Área do barbeiro</h1>
+    <form id="form-login">
+      <div class="campo">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" autocomplete="username" required>
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <input id="senha" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn" id="entrar" type="submit">Entrar</button>
+      <p class="erro-msg" id="erro-login" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="painel" hidden>
+    <div class="barra">
+      <h1 class="dia-titulo" id="titulo-dia"></h1>
+      <button id="ant" aria-label="Dia anterior">‹</button>
+      <input type="date" id="data" aria-label="Escolher data">
+      <button id="prox" aria-label="Próximo dia">›</button>
+      <button id="hoje">Hoje</button>
+      <select id="filtro" aria-label="Filtrar barbeiro"><option value="">Todos os barbeiros</option></select>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="s-total">0</b><span>agendados</span></div>
+      <div class="stat"><b id="s-fat">R$ 0</b><span>faturamento previsto</span></div>
+      <div class="stat"><b id="s-canc">0</b><span>cancelados</span></div>
+    </div>
+
+    <div id="lista"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="comum.js"></script>
+<script>
+const C = window.BARBEARIA;
+const STATUS = { confirmado: 'Confirmado', concluido: 'Concluído', cancelado: 'Cancelado' };
+let dataAtual = ymd(new Date());
+let itens = [];
+
+prepararPagina();
+$('#filtro').innerHTML += C.barbeiros.map((b) => `<option value="${esc(b.id)}">${esc(b.nome)}</option>`).join('');
+
+// ---------- Login ----------
+async function iniciar() {
+  const sessao = await Api.sessao();
+  if (sessao) mostrarPainel(); else { $('#login').hidden = false; $('#email').focus(); }
+}
+
+$('#form-login').onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = $('#entrar'), erro = $('#erro-login');
+  btn.disabled = true; erro.textContent = '';
+  try {
+    await Api.entrar($('#email').value.trim(), $('#senha').value);
+    $('#login').hidden = true;
+    mostrarPainel();
+  } catch (err) {
+    erro.textContent = err.message === 'NAO_AUTORIZADO'
+      ? 'Este e-mail não tem acesso ao painel.'
+      : 'E-mail ou senha incorretos.';
+  } finally { btn.disabled = false; }
+};
+
+$('#sair').onclick = async () => { await Api.sair(); location.reload(); };
+
+// ---------- Painel ----------
+function mostrarPainel() {
+  $('#painel').hidden = false;
+  $('#sair').hidden = !Api.online;
+  carregar();
+  setInterval(carregar, 60000); // atualiza sozinho a cada minuto
+}
+
+function mudarDia(delta) {
+  const d = parseYmd(dataAtual); d.setDate(d.getDate() + delta);
+  dataAtual = ymd(d); carregar();
+}
+$('#ant').onclick = () => mudarDia(-1);
+$('#prox').onclick = () => mudarDia(1);
+$('#hoje').onclick = () => { dataAtual = ymd(new Date()); carregar(); };
+$('#data').onchange = (e) => { if (e.target.value) { dataAtual = e.target.value; carregar(); } };
+$('#filtro').onchange = render;
+
+async function carregar() {
+  $('#data').value = dataAtual;
+  const hoje = dataAtual === ymd(new Date());
+  $('#titulo-dia').textContent = hoje ? 'Hoje, ' + dataExtenso(dataAtual) : maiuscula(dataExtenso(dataAtual));
+  try {
+    itens = await Api.listar(dataAtual);
+    render();
+  } catch (err) {
+    console.error(err);
+    $('#lista').innerHTML = '<p class="vazio">Erro ao carregar os agendamentos. Recarregue a página.</p>';
+  }
+}
+
+function render() {
+  const f = $('#filtro').value;
+  const lista = itens.filter((a) => !f || a.barbeiro === f);
+  const ativos = lista.filter((a) => a.status !== 'cancelado');
+  $('#s-total').textContent = ativos.length;
+  $('#s-fat').textContent = brl(ativos.reduce((s, a) => s + Number(a.preco || 0), 0));
+  $('#s-canc').textContent = lista.length - ativos.length;
+
+  if (!lista.length) {
+    $('#lista').innerHTML = '<p class="vazio">Nenhum agendamento neste dia.</p>';
+    return;
+  }
+  $('#lista').innerHTML = lista.map((a) => {
+    const fim = toHora(toMin(a.hora_inicio) + a.duracao);
+    const msg = `Olá ${a.cliente_nome.split(' ')[0]}! Confirmando seu horário na ${C.nome}: ${a.servico_nome}, ${dataExtenso(a.data)} às ${a.hora_inicio}.`;
+    const botoes = a.status === 'confirmado'
+      ? `<button data-id="${a.id}" data-s="concluido">✓ Concluir</button>
+         <button data-id="${a.id}" data-s="cancelado">✕ Cancelar</button>`
+      : `<button data-id="${a.id}" data-s="confirmado">↺ Reabrir</button>`;
+    return `
+      <article class="ag ${a.status}">
+        <div class="ag-hora">${a.hora_inicio}<small>até ${fim}</small></div>
+        <div class="ag-info">
+          <strong>${esc(a.cliente_nome)}</strong>
+          <span>${esc(a.servico_nome)} · ${esc(a.barbeiro_nome)} · ${brl(a.preco)}</span>
+          <a href="${linkWhats(a.cliente_telefone, msg)}" target="_blank" rel="noopener">💬 ${esc(formatarTelefone(a.cliente_telefone))}</a>
+          ${a.observacao ? `<em>“${esc(a.observacao)}”</em>` : ''}
+        </div>
+        <div class="ag-acoes">
+          <span class="badge">${STATUS[a.status]}</span>
+          ${botoes}
+        </div>
+      </article>`;
+  }).join('');
+}
+
+$('#lista').onclick = async (e) => {
+  const b = e.target.closest('button[data-s]'); if (!b) return;
+  const status = b.dataset.s;
+  if (status === 'cancelado' && !confirm('Cancelar este agendamento? O horário volta a ficar livre.')) return;
+  b.disabled = true;
+  try {
+    await Api.mudarStatus(Number(b.dataset.id), status);
+    await carregar();
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível atualizar. Tente de novo.');
+    b.disabled = false;
+  }
+};
+
+iniciar();
+</script>
+</body>
+</html>

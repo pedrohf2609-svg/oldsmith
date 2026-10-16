@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agendamento Online</title>
+<meta name="description" content="Agende seu horário online em menos de 1 minuto.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="logo" data-logo>✂</div>
+    <h1 data-nome></h1>
+    <p id="slogan"></p>
+    <div class="info">
+      <span id="endereco"></span>
+      <a id="insta" target="_blank" rel="noopener" hidden></a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="aviso" class="aviso" hidden></div>
+
+  <ol class="passos" id="passos">
+    <li class="ativo">Serviço</li>
+    <li>Barbeiro</li>
+    <li>Horário</li>
+    <li>Seus dados</li>
+  </ol>
+
+  <section class="painel" id="p1">
+    <h2>Qual serviço você quer?</h2>
+    <div class="grade" id="servicos"></div>
+  </section>
+
+  <section class="painel" id="p2" hidden>
+    <button class="voltar" data-voltar="1">← Voltar</button>
+    <h2>Escolha o barbeiro</h2>
+    <div class="grade" id="barbeiros"></div>
+  </section>
+
+  <section class="painel" id="p3" hidden>
+    <button class="voltar" data-voltar="2">← Voltar</button>
+    <h2>Escolha o dia</h2>
+    <div class="dias" id="dias"></div>
+    <h2>Horários disponíveis</h2>
+    <div class="horas" id="horas"></div>
+  </section>
+
+  <section class="painel" id="p4" hidden>
+    <button class="voltar" data-voltar="3">← Voltar</button>
+    <h2>Confirme seu agendamento</h2>
+    <div class="resumo" id="resumo"></div>
+    <form id="form" novalidate>
+      <div class="campo">
+        <label for="nome">Seu nome</label>
+        <input id="nome" name="nome" autocomplete="name" maxlength="80" required placeholder="Ex.: Pedro Henrique">
+      </div>
+      <div class="campo">
+        <label for="tel">WhatsApp</label>
+        <input id="tel" name="tel" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" required placeholder="(11) 99999-9999">
+      </div>
+      <div class="campo">
+        <label for="obs">Observação (opcional)</label>
+        <textarea id="obs" name="obs" rows="2" maxlength="300" placeholder="Ex.: quero degradê baixo"></textarea>
+      </div>
+      <button class="btn" id="confirmar" type="submit">Confirmar agendamento</button>
+      <p class="erro-msg" id="erro" role="alert"></p>
+    </form>
+  </section>
+
+  <section class="painel sucesso" id="p5" hidden>
+    <div class="check">✓</div>
+    <h2>Agendamento confirmado!</h2>
+    <p class="muted">Te esperamos. Se precisar remarcar, é só chamar no WhatsApp.</p>
+    <div class="resumo" id="resumo-final"></div>
+    <div class="acoes">
+      <a class="btn whats" id="btn-whats" target="_blank" rel="noopener">Avisar a barbearia no WhatsApp</a>
+      <button class="btn sec" id="novo">Fazer outro agendamento</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <h3>Horário de funcionamento</h3>
+      <ul id="func"></ul>
+    </div>
+    <div>
+      <h3 data-nome></h3>
+      <p id="end-rodape" style="margin:0 0 8px"></p>
+      <a href="admin.html">Área do barbeiro</a>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="comum.js"></script>
+<script>
+const C = window.BARBEARIA;
+const st = { servico: null, barbeiro: null, data: null, hora: null };
+
+// ---------- Cabeçalho e rodapé ----------
+prepararPagina();
+document.title = `Agendar horário — ${C.nome}`;
+$('#slogan').textContent = C.slogan;
+$('#endereco').textContent = '📍 ' + C.endereco;
+$('#end-rodape').textContent = C.endereco;
+if (C.instagram) {
+  const a = $('#insta');
+  a.href = 'https://instagram.com/' + encodeURIComponent(C.instagram);
+  a.textContent = '📷 @' + C.instagram;
+  a.hidden = false;
+}
+$('#func').innerHTML = [1, 2, 3, 4, 5, 6, 0].map((d) => {
+  const h = C.horarios[d];
+  return `<li><span>${DIAS[d]}</span><span>${h ? h.join(' – ') : 'Fechado'}</span></li>`;
+}).join('');
+
+// ---------- Navegação entre passos ----------
+function irPara(n) {
+  for (let i = 1; i <= 5; i++) $('#p' + i).hidden = i !== n;
+  document.querySelectorAll('#passos li').forEach((li, i) => {
+    li.classList.toggle('ativo', i + 1 === n);
+    li.classList.toggle('feito', i + 1 < n);
+  });
+  $('#passos').hidden = n === 5;
+  const alvo = n === 5 ? $('#p5') : $('#passos');
+  window.scrollTo({ top: alvo.getBoundingClientRect().top + window.scrollY - 12, behavior: 'smooth' });
+}
+document.querySelectorAll('[data-voltar]').forEach((b) => { b.onclick = () => irPara(+b.dataset.voltar); });
+
+// ---------- Passo 1: serviço ----------
+$('#servicos').innerHTML = C.servicos.map((s) => `
+  <button class="opcao" data-id="${esc(s.id)}">
+    <span class="op-titulo">${esc(s.nome)}</span>
+    <span class="op-desc">${esc(s.desc)}</span>
+    <span class="op-meta"><b>${brl(s.preco)}</b> · ${s.duracao} min</span>
+  </button>`).join('');
+$('#servicos').onclick = (e) => {
+  const b = e.target.closest('.opcao'); if (!b) return;
+  st.servico = C.servicos.find((s) => s.id === b.dataset.id);
+  irPara(2);
+};
+
+// ---------- Passo 2: barbeiro ----------
+$('#barbeiros').innerHTML = C.barbeiros.map((b) => `
+  <button class="opcao barbeiro" data-id="${esc(b.id)}">
+    <span class="avatar">${esc(iniciais(b.nome))}</span>
+    <span><span class="op-titulo">${esc(b.nome)}</span><br><span class="op-desc">${esc(b.especialidade || '')}</span></span>
+  </button>`).join('');
+$('#barbeiros').onclick = (e) => {
+  const b = e.target.closest('.opcao'); if (!b) return;
+  st.barbeiro = C.barbeiros.find((x) => x.id === b.dataset.id);
+  renderDias();
+  irPara(3);
+};
+
+// ---------- Passo 3: dia e horário ----------
+function proximosDias() {
+  const out = [];
+  const agora = new Date();
+  const base = new Date(agora); base.setHours(0, 0, 0, 0);
+  for (let i = 0; i < C.diasAntecedencia; i++) {
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    const exp = C.horarios[d.getDay()];
+    if (!exp) continue;
+    // Hoje só aparece se ainda der tempo de atender antes de fechar
+    const minAgora = agora.getHours() * 60 + agora.getMinutes() + C.antecedenciaMin;
+    if (i === 0 && minAgora + st.servico.duracao > toMin(exp[1])) continue;
+    out.push(d);
+  }
+  return out;
+}
+
+function renderDias() {
+  const dias = proximosDias();
+  if (!st.data || !dias.some((d) => ymd(d) === st.data)) st.data = dias.length ? ymd(dias[0]) : null;
+  $('#dias').innerHTML = dias.map((d) => `
+    <button class="dia ${ymd(d) === st.data ? 'sel' : ''}" data-d="${ymd(d)}">
+      <small>${ymd(d) === ymd(new Date()) ? 'Hoje' : DIAS[d.getDay()]}</small>
+      <b>${d.getDate()}</b>
+      <small>${MESES[d.getMonth()]}</small>
+    </button>`).join('');
+  renderHoras();
+}
+$('#dias').onclick = (e) => {
+  const b = e.target.closest('.dia'); if (!b) return;
+  st.data = b.dataset.d;
+  document.querySelectorAll('.dia').forEach((x) => x.classList.toggle('sel', x === b));
+  renderHoras();
+};
+
+function gerarHorarios(data, duracao, ocupados) {
+  const d = parseYmd(data);
+  const exp = C.horarios[d.getDay()];
+  if (!exp) return [];
+  const [abre, fecha] = exp.map(toMin);
+  const pausa = C.pausa ? C.pausa.map(toMin) : null;
+  const agora = new Date();
+  const limiteHoje = ymd(agora) === data ? agora.getHours() * 60 + agora.getMinutes() + C.antecedenciaMin : -1;
+  const ocup = ocupados.map((o) => [toMin(o.hora), toMin(o.hora) + o.duracao]);
+  const out = [];
+  for (let m = abre; m + duracao <= fecha; m += C.intervaloMin) {
+    if (m < limiteHoje) continue;
+    if (pausa && sobrepoe(m, m + duracao, pausa[0], pausa[1])) continue;
+    if (ocup.some(([a, b]) => sobrepoe(m, m + duracao, a, b))) continue;
+    out.push(toHora(m));
+  }
+  return out;
+}
+
+async function renderHoras() {
+  const box = $('#horas');
+  if (!st.data) { box.innerHTML = '<p class="muted">Nenhum dia disponível.</p>'; return; }
+  const pedido = st.data + st.barbeiro.id;
+  box.innerHTML = '<p class="muted">Carregando horários…</p>';
+  let ocupados;
+  try {
+    ocupados = await Api.ocupados(st.data, st.barbeiro.id);
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = '<p class="erro-msg">Não foi possível carregar os horários. Tente novamente.</p>';
+    return;
+  }
+  if (pedido !== st.data + st.barbeiro.id) return; // usuário trocou de dia enquanto carregava
+  const horas = gerarHorarios(st.data, st.servico.duracao, ocupados);
+  box.innerHTML = horas.length
+    ? horas.map((h) => `<button class="hora" data-h="${h}">${h}</button>`).join('')
+    : '<p class="muted">Nenhum horário livre neste dia. Escolha outro dia.</p>';
+}
+$('#horas').onclick = (e) => {
+  const b = e.target.closest('.hora'); if (!b) return;
+  st.hora = b.dataset.h;
+  $('#resumo').innerHTML = resumoHtml();
+  $('#erro').textContent = '';
+  irPara(4);
+};
+
+function resumoHtml() {
+  const fim = toHora(toMin(st.hora) + st.servico.duracao);
+  return `
+    <div><span>Serviço</span><b>${esc(st.servico.nome)}</b></div>
+    <div><span>Barbeiro</span><b>${esc(st.barbeiro.nome)}</b></div>
+    <div><span>Data</span><b>${maiuscula(dataExtenso(st.data))}</b></div>
+    <div><span>Horário</span><b>${st.hora} – ${fim}</b></div>
+    <div class="total"><span>Valor</span><b>${brl(st.servico.preco)}</b></div>`;
+}
+
+// ---------- Passo 4: dados e confirmação ----------
+try {
+  const salvo = JSON.parse(localStorage.getItem('barbearia_cliente') || 'null');
+  if (salvo) { $('#nome').value = salvo.nome || ''; $('#tel').value = salvo.tel || ''; }
+} catch { /* sem armazenamento */ }
+
+$('#tel').addEventListener('input', (e) => {
+  const n = e.target.value.replace(/\D/g, '').slice(0, 11);
+  e.target.value = n.length > 6 ? `(${n.slice(0, 2)}) ${n.slice(2, n.length - 4)}-${n.slice(-4)}`
+    : n.length > 2 ? `(${n.slice(0, 2)}) ${n.slice(2)}` : n;
+});
+
+$('#form').onsubmit = async (e) => {
+  e.preventDefault();
+  const nome = $('#nome').value.trim();
+  const tel = $('#tel').value.replace(/\D/g, '');
+  const erro = $('#erro');
+  if (nome.length < 2) { erro.textContent = 'Digite seu nome.'; $('#nome').focus(); return; }
+  if (tel.length < 10 || tel.length > 11) { erro.textContent = 'Digite um WhatsApp válido com DDD.'; $('#tel').focus(); return; }
+  erro.textContent = '';
+
+  const btn = $('#confirmar');
+  btn.disabled = true; btn.textContent = 'Agendando…';
+  try {
+    await Api.agendar({
+      cliente_nome: nome, cliente_telefone: tel,
+      servico: st.servico.id, servico_nome: st.servico.nome, preco: st.servico.preco,
+      barbeiro: st.barbeiro.id, barbeiro_nome: st.barbeiro.nome,
+      data: st.data, hora_inicio: st.hora, duracao: st.servico.duracao,
+      observacao: $('#obs').value.trim(),
+    });
+    try { localStorage.setItem('barbearia_cliente', JSON.stringify({ nome, tel: $('#tel').value })); } catch { /* ok */ }
+    $('#resumo-final').innerHTML = resumoHtml();
+    const msg = `Olá! Acabei de agendar pelo site:\n${st.servico.nome} com ${st.barbeiro.nome}\n${dataExtenso(st.data)} às ${st.hora}\nNome: ${nome}`;
+    $('#btn-whats').href = linkWhats(C.whatsapp, msg);
+    irPara(5);
+  } catch (err) {
+    console.error(err);
+    if (String(err.message).includes('HORARIO_OCUPADO')) {
+      erro.textContent = 'Poxa, alguém acabou de reservar esse horário. Escolha outro, por favor.';
+      setTimeout(() => { irPara(3); renderHoras(); }, 1800);
+    } else {
+      erro.textContent = 'Não foi possível agendar agora. Verifique sua internet e tente de novo.';
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = 'Confirmar agendamento';
+  }
+};
+
+$('#novo').onclick = () => {
+  Object.assign(st, { servico: null, barbeiro: null, data: null, hora: null });
+  $('#obs').value = '';
+  irPara(1);
+};
+</script>
+</body>
+</html>
